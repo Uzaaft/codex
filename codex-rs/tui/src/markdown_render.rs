@@ -814,7 +814,14 @@ where
             .last()
             .map(Option::is_some)
             .unwrap_or(false);
-        let width = depth * 4 - 3;
+        // Four columns per nesting level, clamped so the indent never eats more
+        // than half of the wrap width. Unclamped, a deeply nested list pushes its
+        // own text off the right edge: past roughly 24 levels at 100 columns every
+        // item wrapped to one character per line.
+        let mut width = depth * 4 - 3;
+        if let Some(wrap_width) = self.wrap_width {
+            width = width.min((wrap_width / 2).max(1));
+        }
         let marker = if let Some(last_index) = self.list_indices.last_mut() {
             match last_index {
                 None => Some(vec![Span::styled(

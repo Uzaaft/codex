@@ -1982,3 +1982,35 @@ fn table_key_value_fallback_preserves_rich_values_and_themed_labels() {
             .any(|span| span.style.add_modifier.contains(Modifier::UNDERLINED))
     }));
 }
+
+#[test]
+fn deeply_nested_lists_keep_room_for_their_text() {
+    let mut input = String::new();
+    for depth in 0..40 {
+        input.push_str(&" ".repeat(depth * 2));
+        input.push_str(&format!("- item {depth}\n"));
+    }
+
+    let text = render_markdown_text_with_width(&input, Some(60));
+    let lines = plain_lines(&text);
+
+    let widest_indent = lines
+        .iter()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.len() - line.trim_start().len())
+        .max()
+        .unwrap_or(0);
+    assert!(
+        widest_indent <= 30,
+        "indent grew to {widest_indent} columns of a 60 column viewport"
+    );
+
+    // Each item has to fit on its own line. Before the indent was clamped the
+    // deepest items wrapped to one character per line, turning 40 items into
+    // hundreds of rows.
+    assert!(
+        lines.len() <= 60,
+        "40 items rendered as {} lines",
+        lines.len()
+    );
+}
