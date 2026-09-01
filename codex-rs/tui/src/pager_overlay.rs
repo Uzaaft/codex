@@ -284,7 +284,11 @@ impl PagerView {
         };
         let pct_text = format!(" {percent}% ");
         let pct_w = pct_text.chars().count() as u16;
-        let pct_x = sep_rect.x + sep_rect.width - pct_w - 1;
+        // A terminal narrower than the label leaves nowhere to draw it;
+        // subtracting unconditionally underflows and panics in debug builds.
+        let Some(pct_x) = sep_rect.right().checked_sub(pct_w + 1) else {
+            return;
+        };
         Span::from(pct_text)
             .dim()
             .render(Rect::new(pct_x, sep_rect.y, pct_w, 1), buf);
@@ -1881,5 +1885,21 @@ mod tests {
             pv.is_scrolled_to_bottom(),
             "expected view to report at bottom after scrolling to end"
         );
+    }
+
+    #[test]
+    fn transcript_overlay_renders_in_a_terminal_narrower_than_the_scroll_label() {
+        // The bottom bar draws a " 100% " scroll indicator flush to the right
+        // edge. When the viewport is narrower than that label there is nowhere
+        // to put it, and computing its x position used to underflow.
+        let mut overlay = transcript_overlay(vec![Arc::new(TestCell {
+            lines: vec![Line::from("alpha"), Line::from("beta")],
+        })]);
+
+        for width in 1..=8 {
+            let area = Rect::new(/*x*/ 0, /*y*/ 0, width, /*height*/ 6);
+            let mut buf = Buffer::empty(area);
+            overlay.render(area, &mut buf);
+        }
     }
 }
